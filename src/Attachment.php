@@ -41,4 +41,6 @@ abstract class Attachment
     {
         return $this->type;
     }
+
+    abstract public function getData(): array;
 }

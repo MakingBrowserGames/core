@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace LotGD\Core\Console\Command;
 
+use Composer\Repository\RepositoryInterface;
+use LotGD\Core\ModuleManager;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -32,18 +34,37 @@ class ModuleRegisterCommand extends BaseCommand
         $modules = $this->game->getComposerManager()->getModulePackages();
 
         foreach ($modules as $p) {
-            $library = new LibraryConfiguration($this->game->getComposerManager(), $p, $this->game->getCWD());
-            $name = $library->getName();
+            $this->registerModule($p->getName(), $output);
+        }
+    }
 
-            try {
-                $this->game->getModuleManager()->register($library);
+    protected function registerModule(
+        string $packageName,
+        OutputInterface $output
+    ) {
+        $composerRepository = $this->game->getComposerManager()->getComposer()
+            ->getRepositoryManager()->getLocalRepository();
+        $moduleManager = $this->game->getModuleManager();
 
-                $output->writeln("<info>Registered new module {$name}</info>");
-            } catch (ModuleAlreadyExistsException $e) {
-                $output->writeln("Skipping already registered module {$name}");
-            } catch (ClassNotFoundException $e) {
-                $output->writeln("<error>Error installing module {$name}: " . $e->getMessage() . "</error>");
-            }
+        $package = $composerRepository->findPackage($packageName, "*");
+        if ($package->getType() !== "lotgd-module") {
+            return;
+        }
+
+        $library = new LibraryConfiguration($this->game->getComposerManager(), $package, $this->game->getCWD());
+
+        $dependencies = $package->getRequires();
+        foreach ($dependencies as $dependency) {
+            $this->registerModule($dependency->getTarget(), $output);
+        }
+
+        try {
+            $this->game->getModuleManager()->register($library);
+            $output->writeln("<info>Registered new module {$name}</info>");
+        } catch (ModuleAlreadyExistsException $e) {
+            $output->writeln("Skipping already registered module {$name}");
+        } catch (ClassNotFoundException $e) {
+            $output->writeln("<error>Error installing module {$name}: " . $e->getMessage() . "</error>");
         }
     }
 }

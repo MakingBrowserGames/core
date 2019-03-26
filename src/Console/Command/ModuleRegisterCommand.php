@@ -33,14 +33,24 @@ class ModuleRegisterCommand extends BaseCommand
     {
         $modules = $this->game->getComposerManager()->getModulePackages();
 
+        $registered = [];
         foreach ($modules as $p) {
-            $this->registerModule($p->getName(), $output);
+            $this->registerModule($p->getName(), $output, $registered);
         }
     }
 
+    /**
+     * Register a given package as a module if it is of type lotdg-module. Resolves dependencies and skips already registered packages.
+     * @param string $packageName
+     * @param OutputInterface $output
+     * @param array $registered
+     * @throws \LotGD\Core\Exceptions\InvalidConfigurationException
+     * @throws \LotGD\Core\Exceptions\WrongTypeException
+     */
     protected function registerModule(
         string $packageName,
-        OutputInterface $output
+        OutputInterface $output,
+        array &$registered
     ) {
         $composerRepository = $this->game->getComposerManager()->getComposer()
             ->getRepositoryManager()->getLocalRepository();
@@ -50,21 +60,28 @@ class ModuleRegisterCommand extends BaseCommand
         if ($package->getType() !== "lotgd-module") {
             return;
         }
+        if (!empty($registered[$packageName])) {
+            return;
+        }
+
+        $output->writeln("Reading module {$packageName} {$package->getPrettyVersion()}");
 
         $library = new LibraryConfiguration($this->game->getComposerManager(), $package, $this->game->getCWD());
 
         $dependencies = $package->getRequires();
         foreach ($dependencies as $dependency) {
-            $this->registerModule($dependency->getTarget(), $output);
+            $this->registerModule($dependency->getTarget(), $output, $registered);
         }
 
         try {
             $this->game->getModuleManager()->register($library);
-            $output->writeln("<info>Registered new module {$packageName}</info>");
+            $output->writeln("\t<info>Registered new module {$packageName}</info>");
         } catch (ModuleAlreadyExistsException $e) {
-            $output->writeln("Skipping already registered module {$packageName}");
+            $output->writeln("\tSkipping already registered module {$packageName}");
         } catch (ClassNotFoundException $e) {
-            $output->writeln("<error>Error installing module {$packageName}: " . $e->getMessage() . "</error>");
+            $output->writeln("\t<error>Error installing module {$packageName}: " . $e->getMessage() . "</error>");
         }
+
+        $registered[$packageName] = true;
     }
 }

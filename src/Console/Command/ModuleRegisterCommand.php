@@ -11,6 +11,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use LotGD\Core\Exceptions\ClassNotFoundException;
 use LotGD\Core\Exceptions\ModuleAlreadyExistsException;
 use LotGD\Core\LibraryConfiguration;
+use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
  * Danerys command to register and initiate any newly installed modules.
@@ -31,11 +32,12 @@ class ModuleRegisterCommand extends BaseCommand
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
+        $io = new SymfonyStyle($input, $output);
         $modules = $this->game->getComposerManager()->getModulePackages();
 
         $registered = [];
         foreach ($modules as $p) {
-            $this->registerModule($p->getName(), $output, $registered);
+            $this->registerModule($p->getName(), $io, $registered);
         }
     }
 
@@ -49,12 +51,11 @@ class ModuleRegisterCommand extends BaseCommand
      */
     protected function registerModule(
         string $packageName,
-        OutputInterface $output,
+        SymfonyStyle $io,
         array &$registered
     ) {
         $composerRepository = $this->game->getComposerManager()->getComposer()
             ->getRepositoryManager()->getLocalRepository();
-        $moduleManager = $this->game->getModuleManager();
 
         $package = $composerRepository->findPackage($packageName, "*");
         if ($package->getType() !== "lotgd-module") {
@@ -64,22 +65,22 @@ class ModuleRegisterCommand extends BaseCommand
             return;
         }
 
-        $output->writeln("Reading module {$packageName} {$package->getPrettyVersion()}");
+        $io->text("Reading module {$packageName} {$package->getPrettyVersion()}");
 
         $library = new LibraryConfiguration($this->game->getComposerManager(), $package, $this->game->getCWD());
 
         $dependencies = $package->getRequires();
         foreach ($dependencies as $dependency) {
-            $this->registerModule($dependency->getTarget(), $output, $registered);
+            $this->registerModule($dependency->getTarget(), $io, $registered);
         }
 
         try {
             $this->game->getModuleManager()->register($library);
-            $output->writeln("\t<info>Registered new module {$packageName}</info>");
+            $io->success("\tRegistered new module {$packageName}");
         } catch (ModuleAlreadyExistsException $e) {
-            $output->writeln("\tSkipping already registered module {$packageName}");
+            $io->note("\tSkipping already registered module {$packageName}");
         } catch (ClassNotFoundException $e) {
-            $output->writeln("\t<error>Error installing module {$packageName}: " . $e->getMessage() . "</error>");
+            $io->error("\tError installing module {$packageName}: {$e->getMessage()}");
         }
 
         $registered[$packageName] = true;

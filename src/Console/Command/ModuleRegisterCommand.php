@@ -60,11 +60,11 @@ class ModuleRegisterCommand extends BaseCommand
 
         try {
             $this->game->getModuleManager()->register($library);
-            $output->writeln("<info>Registered new module {$name}</info>");
+            $output->writeln("<info>Registered new module {$packageName}</info>");
         } catch (ModuleAlreadyExistsException $e) {
-            $output->writeln("Skipping already registered module {$name}");
+            $output->writeln("Skipping already registered module {$packageName}");
         } catch (ClassNotFoundException $e) {
-            $output->writeln("<error>Error installing module {$name}: " . $e->getMessage() . "</error>");
+            $output->writeln("<error>Error installing module {$packageName}: " . $e->getMessage() . "</error>");
         }
     }
 }
